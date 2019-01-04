@@ -1,0 +1,352 @@
+USE CSE581projects;
+
+CREATE TABLE sarajend.Country (
+	CountryId		INT NOT NULL IDENTITY(1,1),
+	CountryName		VARCHAR(50) NOT NULL 
+	PRIMARY KEY (CountryId)
+);
+
+CREATE TABLE sarajend.State (
+	StateId			INT NOT NULL IDENTITY(1,1),
+	StateName		VARCHAR(50) NOT NULL
+	PRIMARY KEY (StateId)			
+);
+
+CREATE TABLE sarajend.Race (
+	RaceId			INT NOT NULL IDENTITY(1,1),
+	RaceName		VARCHAR(50) NOT NULL
+	PRIMARY KEY (RaceId)			
+);
+
+CREATE TABLE sarajend.Gender (
+	GenderId		INT NOT NULL IDENTITY(1,1),
+	GenderName		VARCHAR(50) NOT NULL
+	PRIMARY KEY (GenderId)			
+);
+
+CREATE TABLE sarajend.Address (
+	AddressId		INT NOT NULL IDENTITY(1,1),
+	Street1			VARCHAR(100) NOT NULL,
+	Street2			VARCHAR(100),
+	City			VARCHAR(50) NOT NULL,		
+	StateId			INT NOT NULL,
+	ZipCode			INT NOT NULL,
+	CountryId		INT NOT NULL,
+
+	PRIMARY KEY (AddressId),
+	FOREIGN KEY (StateId) REFERENCES State(StateId),
+	FOREIGN KEY (CountryId) REFERENCES Country(CountryId)			
+);
+
+
+CREATE TABLE sarajend.Person (
+	
+	PersonId			INT NOT NULL IDENTITY(1,1),
+	NTID				VARCHAR(20) NOT NULL,
+	SSN					VARCHAR(20),
+	Password			VARCHAR(50),
+	FirstName			VARCHAR(50) NOT NULL,
+	MiddleName			VARCHAR(1),
+	LastName			VARCHAR(50) NOT NULL,
+	DateOfBirth			DATE NOT NULL,
+	GenderId			INT NOT NULL,
+	RaceId				INT NOT NULL,
+	EmailId				VARCHAR(100),
+	PhoneNumber			VARCHAR(20),
+	HomeAddressId		INT NOT NULL,
+	MailingAddressId	INT  
+	
+	PRIMARY KEY (PersonId),
+	FOREIGN KEY (GenderId) REFERENCES Gender(GenderId),
+	FOREIGN KEY (RaceId) REFERENCES Race(RaceId),
+	FOREIGN KEY (HomeAddressId) REFERENCES Address(AddressId),
+	FOREIGN KEY (MailingAddressId) REFERENCES Address(AddressId)		
+);	
+
+
+CREATE TABLE sarajend.StudentStatus (
+	StudentStatusId			INT NOT NULL IDENTITY(1,1),
+	StudentStatusDesc		VARCHAR(50) NOT NULL
+	PRIMARY KEY (StudentStatusId)			
+);
+
+CREATE TABLE sarajend.StudentType (
+	StudentTypeId			INT NOT NULL IDENTITY(1,1),
+	StudentTypeDesc			VARCHAR(50) NOT NULL
+	PRIMARY KEY (StudentTypeId)			
+);
+
+CREATE TABLE sarajend.Level (
+	LevelId					INT NOT NULL IDENTITY(1,1),
+	LevelName				VARCHAR(50) NOT NULL
+	PRIMARY KEY (LevelId)			
+);
+
+CREATE TABLE sarajend.Student (
+	StudentId			INT NOT NULL,
+	StudentStatusId		INT NOT NULL,
+	StudentTypeId		INT NOT NULL,
+	StudentLevelId		INT NOT NULL
+
+	PRIMARY KEY (StudentId),
+	FOREIGN KEY (StudentId) REFERENCES Person(PersonId),
+	FOREIGN KEY (StudentStatusId) REFERENCES StudentStatus(StudentStatusId),
+	FOREIGN KEY (StudentTypeId) REFERENCES StudentType(StudentTypeId),
+	FOREIGN KEY (StudentLevelId) REFERENCES Level(LevelId)		
+);
+
+CREATE TABLE sarajend.College (
+	CollegeId			INT NOT NULL IDENTITY(1,1),
+	CollegeName			VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (CollegeId)
+);
+
+CREATE TABLE sarajend.MajorMinor (
+	AreaOfStudyId		INT NOT NULL IDENTITY(1,1),
+	CollegeId			INT NOT NULL,
+	StudyTitle			VARCHAR(50) NOT NULL
+
+	PRIMARY KEY (AreaOfStudyId)
+	FOREIGN KEY (CollegeId) REFERENCES College(CollegeId)
+);
+
+CREATE TABLE sarajend.AreaOfStudy (
+	AreaOfStudyId		INT NOT NULL,
+	StudentId			INT NOT NULL,
+	IsMajor				BIT NOT NULL
+
+	PRIMARY KEY (AreaOfStudyId, StudentId),
+	FOREIGN KEY (AreaOfStudyId) REFERENCES MajorMinor(AreaOfStudyId),
+	FOREIGN KEY (StudentId) REFERENCES Student(StudentId)
+);
+
+
+CREATE TABLE sarajend.Building (
+	BuildingId		INT NOT NULL IDENTITY(1,1),
+	BuildingName	VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (BuildingId)
+);
+
+
+CREATE TABLE sarajend.Projector (
+	ProjectorId		INT NOT NULL IDENTITY(1,1),
+	Projector		VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (ProjectorId)
+);
+
+
+CREATE TABLE sarajend.ClassroomType (
+	ClassroomTypeId				INT NOT NULL IDENTITY(1,1),
+	ClassroomTypeDesc			VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (ClassroomTypeId)
+);
+
+
+CREATE TABLE sarajend.Classroom (
+	ClassroomId					INT NOT NULL IDENTITY(1,1),
+	BuildingId					INT NOT NULL,
+	RoomNumber					INT NOT NULL,
+	FloorLevel					INT NOT NULL,
+	ClassroomTypeId				INT NOT NULL,
+	ClassroomCapacity			INT NOT NULL,
+	ProjectorId					INT,
+	WhiteBoardCount				INT NOT NULL
+
+	PRIMARY KEY (ClassroomId),
+	FOREIGN KEY (BuildingId) REFERENCES Building(BuildingId),
+	FOREIGN KEY (ClassroomTypeId) REFERENCES ClassroomType(ClassroomTypeId),
+	FOREIGN KEY (ProjectorId) REFERENCES Projector(ProjectorId)
+);
+
+
+CREATE TABLE sarajend.SemesterName(
+	SemesterNameId			INT NOT NULL IDENTITY(1,1),
+	SemesterName			VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (SemesterNameId)
+);
+
+
+CREATE TABLE sarajend.Semester ( 
+	SemesterId				INT NOT NULL IDENTITY(1,1),
+	SemesterNameId			INT NOT NULL,
+	SemesterYear			INT NOT NULL,
+	SemesterBeginDate		DATE NOT NULL,
+	SemesterEndDate			DATE NOT NULL
+
+	PRIMARY KEY (SemesterId),
+	FOREIGN KEY (SemesterNameId) REFERENCES SemesterName(SemesterNameId)
+);
+
+
+CREATE TABLE sarajend.Department (
+	DepartmentId			INT NOT NULL IDENTITY(1,1),
+	DepartmentName			VARCHAR(100) NOT NULL
+
+	PRIMARY KEY(DepartmentId) 
+);
+
+CREATE TABLE sarajend.Course (
+	CourseCode				VARCHAR(25) NOT NULL,
+	CourseNumber			INT NOT NULL,
+	CourseTitle				VARCHAR(100) NOT NULL,
+	CourseDescription		VARCHAR(200),
+	DepartmentId			INT NOT NULL,
+	LevelId					INT NOT NULL,
+	CourseCreditHours		INT NOT NULL
+	
+	PRIMARY KEY (CourseCode, CourseNumber),
+	FOREIGN KEY (LevelId) REFERENCES Level(LevelId),
+	FOREIGN KEY (DepartmentId) REFERENCES Department(DepartmentId)
+);
+
+
+CREATE TABLE sarajend.CoursePrerequisite (
+
+	ParentCourseCode		VARCHAR(25) NOT NULL,
+	ParentCourseNumber		INT NOT NULL,
+	ChildCourseCode			VARCHAR(25) NOT NULL,			
+	ChildCourseNumber		INT NOT NULL
+
+	PRIMARY KEY (ParentCourseCode, ParentCourseNumber, ChildCourseCode, ChildCourseNumber),
+	FOREIGN KEY (ParentCourseCode, ParentCourseNumber) REFERENCES Course(CourseCode, CourseNumber),
+	FOREIGN KEY (ChildCourseCode, ChildCourseNumber) REFERENCES Course(CourseCode, CourseNumber)
+);
+
+
+CREATE TABLE sarajend.CourseSchedule (
+	CourseRegNumber			INT NOT NULL IDENTITY(1,1),
+	CourseCode				VARCHAR(25) NOT NULL,
+	CourseNumber			INT NOT NULL,
+	Section					VARCHAR(10) NOT NULL,
+	SemesterId				INT NOT NULL,
+	ClassroomId				INT NOT NULL
+
+	PRIMARY KEY (CourseRegNumber),
+	FOREIGN KEY (CourseCode, CourseNumber) REFERENCES Course(CourseCode, CourseNumber),
+	FOREIGN KEY (SemesterId) REFERENCES Semester(SemesterId),
+	FOREIGN KEY (ClassroomId) REFERENCES Classroom(ClassroomId)
+);
+
+
+
+CREATE TABLE sarajend.CourseWeeklySchedule (
+	ScheduleId				INT NOT NULL IDENTITY(1,1),
+	CourseRegNumber			INT NOT NULL,
+	DayOfClass				VARCHAR(10) NOT NULL,
+	ClassStartHour			INT NOT NULL CHECK (ClassStartHour >= 0 AND ClassStartHour <= 23),
+	ClassStartMinute		INT NOT NULL CHECK (ClassStartMinute >= 0 AND ClassStartMinute <= 59),				
+	ClassEndHour			INT NOT NULL CHECK (ClassEndHour >= 0 AND ClassEndHour <= 23),
+	ClassEndMinute			INT NOT NULL CHECK (ClassEndMinute >= 0 AND ClassEndMinute <= 59)
+
+	PRIMARY KEY (ScheduleId),
+	FOREIGN KEY (CourseRegNumber) REFERENCES CourseSchedule(CourseRegNumber)
+);
+
+
+CREATE TABLE sarajend.EnrollmentStatus (
+	EnrollmentStatusId		INT NOT NULL IDENTITY(1,1),
+	EnrollmentStatusDesc	VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (EnrollmentStatusId)
+);
+
+
+CREATE TABLE sarajend.CourseEnrollment (
+	StudentId			INT NOT NULL,
+	CourseRegNumber		INT NOT NULL,
+	EnrollmentStatusId	INT NOT NULL,
+	MidtermGrade		DECIMAL CHECK (MidtermGrade >= 0 AND MidtermGrade <= 100),
+	FinalGrade			DECIMAL CHECK (FinalGrade >= 0 AND FinalGrade <= 100)
+
+	PRIMARY KEY (StudentId, CourseRegNumber) 
+	FOREIGN KEY (StudentId)			REFERENCES Student(StudentId),
+	FOREIGN KEY (CourseRegNumber)	REFERENCES CourseSchedule(CourseRegNumber),
+	FOREIGN KEY (EnrollmentStatusId) REFERENCES EnrollmentStatus(EnrollmentStatusId)
+);
+
+
+CREATE TABLE sarajend.JobType (
+	JobTypeId				INT NOT NULL IDENTITY (1,1),
+	JobTypeDesc				VARCHAR(100) NOT NULL
+
+	PRIMARY KEY(JobTypeId)
+);
+
+CREATE TABLE sarajend.Job(
+	JobId				INT NOT NULL IDENTITY(1,1),
+	JobTitle			VARCHAR(100) NOT NULL,
+	JobDescription		VARCHAR(100),
+	JobRequirements		VARCHAR(100) NOT NULL,
+	JobTypeId			INT NOT NULL,
+	isFaculty			BIT NOT NULL,
+	MinPay				DECIMAL NOT NULL,
+	MaxPay				DECIMAL NOT NULL
+
+	PRIMARY KEY (JobId),
+	FOREIGN KEY (JobTypeId) REFERENCES JobType(JobTypeId)
+);
+
+
+CREATE TABLE sarajend.Employee (
+	EmployeeId			INT NOT NULL,
+	AnnualSalary		DECIMAL NOT NULL
+	
+	PRIMARY KEY (EmployeeId),
+	FOREIGN KEY (EmployeeId) REFERENCES Person(PersonId)	
+);
+
+CREATE TABLE sarajend.EmployeeJob (
+	EmployeeId		INT NOT NULL,
+	JobId			INT NOT NULL
+
+	PRIMARY KEY (EmployeeId, JobId)
+	FOREIGN KEY (EmployeeId) REFERENCES Employee(EmployeeId),
+	FOREIGN KEY (JobId)		 REFERENCES Job(JobId)
+);
+
+
+CREATE TABLE sarajend.EmployeeCourse (
+	CourseRegNumber			INT NOT NULL,
+	EmployeeId				INT NOT NULL
+
+	PRIMARY KEY (CourseRegNumber, EmployeeId),
+	FOREIGN KEY (CourseRegNumber) REFERENCES CourseSchedule(CourseRegNumber),
+	FOREIGN KEY (EmployeeId) REFERENCES Employee(EmployeeId)
+);
+
+
+CREATE TABLE sarajend.BenefitType (
+	BenefitTypeId			INT NOT NULL IDENTITY(1,1),
+	BenefitTypeDesc			VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (BenefitTypeId)
+);
+
+
+CREATE TABLE sarajend.BenefitCover (
+	BenefitCoverId			INT NOT NULL IDENTITY(1,1),
+	BenefitCoverDesc		VARCHAR(100) NOT NULL
+
+	PRIMARY KEY (BenefitCoverId)
+);
+
+
+CREATE TABLE sarajend.EmployeeBenefit(
+	EmployeeId				INT NOT NULL,
+	BenefitTypeId			INT NOT NULL,
+	BenefitCoverId			INT NOT NULL,
+	EmployeePremiumAmount	DECIMAL NOT NULL,
+	EmployerPremiumAmount	DECIMAL NOT NULL
+
+	PRIMARY KEY(EmployeeId, BenefitTypeId, BenefitCoverId),
+	FOREIGN KEY(EmployeeId) REFERENCES Employee(EmployeeId),
+	FOREIGN KEY(BenefitTypeId) REFERENCES BenefitType(BenefitTypeId),
+	FOREIGN KEY(BenefitCoverId) REFERENCES BenefitCover(BenefitCoverId)
+);
+
+---

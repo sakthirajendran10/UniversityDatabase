@@ -1,0 +1,387 @@
+Project 3 - Queries:
+====================
+
+SP1:
+=====
+CREATE PROCEDURE sarajend.sp_withCursorFindBenefitTotal 
+AS
+BEGIN
+	DECLARE @employeeId INTEGER
+	DECLARE @employeeName VARCHAR(100)
+	DECLARE @employeeIdFromTable INTEGER
+	DECLARE @totalEmployeePremiumAmount DECIMAL(18,0) = 0
+	DECLARE @totalEmployerPremiumAmount DECIMAL(18,0) = 0
+	DECLARE @tempEmployeePremiumAmount DECIMAL(18,0) = 0
+	DECLARE @tempEmployerPremiumAmount DECIMAL(18,0) = 0
+	DECLARE @resultTable table(EmployeeName  VARCHAR(100), EmployeeId INTEGER, TotalEmployeePremiumAmount DECIMAL(18,0), TotalEmployerPremiumAmount DECIMAL(18,0))
+
+	DECLARE uniqueEmployeesCursor CURSOR STATIC FOR 
+		 SELECT DISTINCT e.EmployeeId
+		   FROM Employee e, Person p
+		  WHERE e.EmployeeId = p.PersonId
+
+	OPEN uniqueEmployeesCursor
+
+	IF (@@CURSOR_ROWS > 0)
+		BEGIN
+			FETCH NEXT FROM uniqueEmployeesCursor INTO @employeeId
+	
+			WHILE @@FETCH_STATUS = 0
+				BEGIN
+					DECLARE totalBenefitCursor CURSOR STATIC FOR
+						SELECT (p.FirstName + ' ' +  p.LastName) AS EmployeeName, e.EmployeeId, eb.EmployeePremiumAmount, eb.EmployerPremiumAmount
+						  FROM Employee e, BenefitCover bc, BenefitType bt, EmployeeBenefit eb, Person p
+						 WHERE e.EmployeeId = p.PersonId 
+						   AND e.EmployeeId = eb.EmployeeId
+						   AND eb.BenefitTypeId = bt.BenefitTypeId
+						   AND eb.BenefitCoverId = bc.BenefitCoverId 
+						   AND eb.EmployeeId = @employeeId
+
+					OPEN totalBenefitCursor
+
+					IF (@@CURSOR_ROWS > 0)
+						BEGIN
+							FETCH NEXT FROM totalBenefitCursor INTO @employeeName, @employeeIdFromTable, @tempEmployeePremiumAmount, @tempEmployerPremiumAmount
+
+							WHILE @@FETCH_STATUS = 0
+								BEGIN
+									SELECT @totalEmployeePremiumAmount = @totalEmployeePremiumAmount + @tempEmployeePremiumAmount
+									SELECT @totalEmployerPremiumAmount = @totalEmployerPremiumAmount + @tempEmployerPremiumAmount
+									FETCH NEXT FROM totalBenefitCursor INTO @employeeName, @employeeIdFromTable, @tempEmployeePremiumAmount, @tempEmployerPremiumAmount
+								END
+								INSERT INTO @resultTable VALUES ( @employeeName, @employeeIdFromTable, @totalEmployeePremiumAmount, @totalEmployerPremiumAmount)
+								SET @totalEmployeePremiumAmount = 0
+								SET @totalEmployerPremiumAmount = 0
+						END
+					
+					CLOSE totalBenefitCursor
+					DEALLOCATE totalBenefitCursor
+
+					FETCH NEXT FROM uniqueEmployeesCursor INTO @employeeId
+				END
+		END
+
+	CLOSE uniqueEmployeesCursor
+	DEALLOCATE uniqueEmployeesCursor
+
+	SELECT * FROM @resultTable
+END 
+GO
+===================================================================================================================================================
+SP2:
+=====
+CREATE PROCEDURE sarajend.sp_updateClassroomSchedule
+(
+   @courseCode			VARCHAR(25),
+   @courseNumber		AS INTEGER,
+   @semesterId		    AS INTEGER,
+
+   @oldClassroomId		AS INTEGER,
+   @oldDayOfClass		VARCHAR(10),
+   @oldClassStartHour	AS INTEGER,
+   @oldClassStartMinute	AS INTEGER,
+   @oldClassEndHour		AS INTEGER,
+   @oldClassEndMinute	AS INTEGER,
+
+   @newClassroomId		AS INTEGER,
+   @newDayOfClass		VARCHAR(10),
+   @newClassStartHour	AS INTEGER,
+   @newClassStartMinute	AS INTEGER,
+   @newClassEndHour		AS INTEGER,
+   @newClassEndMinute	AS INTEGER
+)  
+AS
+	DECLARE @courseRegNumber AS INTEGER
+	DECLARE @scheduleId AS INTEGER
+
+BEGIN
+	IF NOT EXISTS (SELECT * FROM Semester WHERE SemesterId = @SemesterId)
+		BEGIN
+			PRINT 'Invalid SemesterId passed:  ' + CAST(@semesterId AS VARCHAR)
+			RETURN
+		END
+	
+	IF NOT EXISTS (SELECT * FROM Classroom WHERE ClassroomId = @oldClassroomId)
+		BEGIN
+			PRINT 'Invalid Old ClassroomId passed:  ' + CAST(@oldClassroomId AS VARCHAR)
+			RETURN
+		END
+
+	IF NOT EXISTS (SELECT * FROM Classroom WHERE ClassroomId = @newClassroomId)
+		BEGIN
+			PRINT 'Invalid New ClassroomId passed:  ' + CAST(@newClassroomId AS VARCHAR)
+			RETURN
+		END
+
+	IF EXISTS (SELECT * FROM Course WHERE CourseCode = @courseCode AND CourseNumber = @courseNumber) 
+		BEGIN
+			SET @courseRegNumber = (SELECT CourseRegNumber  
+						 FROM CourseSchedule
+						WHERE CourseCode = @courseCode
+						  AND CourseNumber = @courseNumber
+						  AND SemesterId = @semesterId)
+				IF (@courseRegNumber IS NOT NULL)
+				BEGIN
+					IF NOT EXISTS (SELECT cws.CourseRegNumber
+						 FROM CourseSchedule cs, CourseWeeklySchedule cws
+						WHERE cs.CourseRegNumber = cws.CourseRegNumber
+						  AND cs.SemesterId = @semesterId
+						  AND cs.ClassroomId = @newClassroomId
+						  AND cws.ClassStartHour = @newClassStartHour
+						  AND cws.ClassStartMinute = @newClassStartMinute
+						  AND cws.ClassEndHour = @newClassEndHour
+						  AND cws.ClassEndMinute = @newClassEndMinute)
+						BEGIN
+							SET @scheduleId = (SELECT ScheduleId 
+										 FROM CourseSchedule cs, CourseWeeklySchedule cws
+										WHERE cs.CourseRegNumber = cws.CourseRegNumber
+										  AND cs.SemesterId = @semesterId
+										  AND cs.ClassroomId = @oldClassroomId
+										  AND cws.DayOfClass = @oldDayOfClass
+										  AND cws.ClassStartHour = @oldClassStartHour
+										  AND cws.ClassStartMinute = @oldClassStartMinute
+										  AND cws.ClassEndHour = @oldClassEndHour
+										  AND cws.ClassEndMinute = @oldClassEndMinute
+										  AND cws.CourseRegNumber = @courseRegNumber)
+							IF @scheduleId IS NOT NULL 
+								BEGIN
+									PRINT 'Updating CourseSchedule .....'  
+									UPDATE CourseSchedule
+									   SET ClassroomId = @newClassroomId
+									 WHERE CourseRegNumber = @courseRegNumber  	
+
+									PRINT 'Updating CourseWeeklySchedule .....'
+									UPDATE CourseWeeklySchedule
+									   SET DayOfClass = @newDayOfClass,
+										   ClassStartHour = @newClassStartHour,
+										   ClassStartMinute = @newClassStartMinute,
+										   ClassEndHour = @newClassEndHour,
+										   ClassEndMinute = @newClassEndMinute
+									 WHERE ScheduleId = @scheduleId
+								END
+							ELSE
+								BEGIN
+									PRINT 'Old Schedule not found for the details supplied. Cannot update the class schedule'
+								END
+						END
+
+					ELSE
+						BEGIN
+							PRINT 'A schedule already exists for the details supplied. Class is occupied.'
+						END
+
+				END
+			ELSE
+				BEGIN
+					PRINT 'No such CourseSchedule exists in the database'
+				END
+		
+		END
+	ELSE
+		BEGIN
+			PRINT 'Invalid course details supplied: CourseCode: ' + @courseCode + CAST(@courseNumber AS VARCHAR)
+		END
+END 
+GO
+
+===================================================================================================================================================
+SP3:
+=====
+CREATE PROCEDURE sarajend.sp_deleteEmployee
+(@employeeId	AS INTEGER)  
+AS
+	DECLARE @HomeAddressId		AS INTEGER
+	DECLARE @MailingAddressId	AS INTEGER
+
+BEGIN
+	IF EXISTS (SELECT * FROM Employee WHERE EmployeeId = @employeeId)
+		BEGIN 
+			PRINT '1. Deleting from EmployeeJob table..'
+			DELETE FROM EmployeeJob WHERE EmployeeId = @employeeId
+			
+			PRINT '2. Deleting from EmployeeBenefit table..'
+			DELETE FROM EmployeeBenefit WHERE EmployeeId = @employeeId
+			
+			PRINT '3. Deleting from EmployeeCourse table..'
+			DELETE FROM EmployeeCourse WHERE EmployeeId = @employeeId
+
+			PRINT '4. Deleting from Employee table..'
+			DELETE FROM Employee WHERE EmployeeId = @employeeId
+
+			PRINT '5. Delete process from Address table:'
+			( SELECT @HomeAddressId = HomeAddressId, @MailingAddressId = MailingAddressId FROM Person Where PersonId = @employeeId AND MailingAddressId IS NOT NULL)
+
+			IF NOT EXISTS(SELECT * FROM Person Where PersonId <> @employeeId AND ( HomeAddressId = @HomeAddressId or MailingAddressId = @HomeAddressId))
+				BEGIN
+					PRINT '    a. Deleting details from Address table as the HomeAddressId is not associated to any other person..'
+					DELETE FROM Address WHERE AddressId = @HomeAddressId
+				END
+			ELSE 
+				BEGIN
+					PRINT '    a. Cannot delete Address table as the HomeAddressId of the employee to be deleted is associated to some other person..'
+				END
+
+			IF NOT EXISTS(SELECT * FROM Person Where PersonId <> @employeeId AND ( HomeAddressId = @MailingAddressId or MailingAddressId = @MailingAddressId))
+				BEGIN
+					PRINT '    b. Deleting details from Address table as the MailingAddressId is not associated to any other person..'
+					DELETE FROM Address WHERE AddressId = @MailingAddressId
+				END
+			ELSE 
+				BEGIN
+					PRINT '    b. Cannot delete Address table as the MailingAddressId of the employee to be deleted is associated to some other person..'
+				END
+			PRINT '6. Finally, Delete from Person table..'
+			DELETE FROM Person WHERE PersonId = @employeeId 
+		END
+	ELSE
+		BEGIN
+			PRINT 'No employee exists with the EmployeeId passed or Invalid EmployeeId passed: ' + CAST(@employeeId AS VARCHAR)
+		END
+END
+
+===================================================================================================================================================
+SP4:
+=====
+CREATE PROCEDURE sarajend.sp_studentFreeHoursCheck
+(@semesterId AS INT, 
+@semesterYear AS INT,
+@classEndHour AS INT) 
+AS
+BEGIN
+	DECLARE @StudentName VARCHAR(50)
+	DECLARE @LevelName VARCHAR(50)
+	DECLARE @SemId INT
+	DECLARE @SemesterName VARCHAR(50)
+	DECLARE @SemYear VARCHAR(50)
+	DECLARE @FreeHourAfter INT 
+	DECLARE @FreeMinuteAfter INT
+	DECLARE @resultTable table(StudentName  VARCHAR(100), StudentLevel VARCHAR(50), SemesterId INT, SemesterName VARCHAR(50), SemesterYear INT, FreeHourAfter VARCHAR(100))
+
+	IF EXISTS (SELECT * FROM Semester WHERE SemesterId = @semesterId AND SemesterYear = @semesterYear)
+		BEGIN
+			DECLARE studentFreeHoursCursor CURSOR STATIC FOR 
+			   SELECT  DISTINCT  p.FirstName + ' ' + p.LastName as StudentName,  l.LevelName, cs.SemesterId, sn.SemesterName, sem.SemesterYear, cws.ClassEndHour, cws.ClassEndMinute
+				FROM Person p, Student s, StudentStatus ss, StudentType st, Level l, CourseEnrollment ce, CourseSchedule cs, CourseWeeklySchedule cws, Semester sem, SemesterName sn
+				WHERE p.PersonId			= s.StudentId
+				AND s.StudentStatusId		= ss.StudentStatusId
+				AND s.StudentLevelId		= l.LevelId
+				AND s.StudentTypeId			= st.StudentTypeId
+				AND s.StudentId				= ce.StudentId
+				AND ce.CourseRegNumber		= cws.CourseRegNumber
+				AND sem.SemesterId			= cs.SemesterId
+				AND sem.SemesterNameId		= sn.SemesterNameId
+				AND cs.SemesterId			= @semesterId
+				AND sem.SemesterYear		= @semesterYear
+				AND cws.ClassEndHour		<= @classEndHour
+			
+
+				OPEN studentFreeHoursCursor
+
+				IF (@@CURSOR_ROWS > 0)
+					BEGIN
+						FETCH NEXT FROM studentFreeHoursCursor INTO @StudentName, @LevelName, @SemId, @SemesterName, @SemYear, @FreeHourAfter, @FreeMinuteAfter
+						
+						WHILE @@FETCH_STATUS = 0
+							BEGIN
+								IF(@@CURSOR_ROWS <> 0)
+									BEGIN
+										INSERT INTO @resultTable VALUES ( @StudentName, @LevelName, @SemId, @SemesterName, @SemYear, ('Free after ' + CAST(@FreeHourAfter AS VARCHAR) + ':' + CAST(@FreeMinuteAfter AS VARCHAR) + ' hours'))
+										FETCH NEXT FROM studentFreeHoursCursor INTO @StudentName, @LevelName, @SemId, @SemesterName, @SemYear, @FreeHourAfter, @FreeMinuteAfter 
+									END
+							END
+					END
+
+				CLOSE studentFreeHoursCursor
+				DEALLOCATE studentFreeHoursCursor
+
+				SELECT DISTINCT * FROM @resultTable
+		END
+	ELSE 
+		BEGIN
+			PRINT 'Invalid Semester Id / Semester Year Passed => SemesterId: ' + CAST (@semesterId AS VARCHAR) + ' AND Semester Year: ' + CAST(@semesterYear AS VARCHAR)
+		END
+	
+END 
+RETURN
+GO
+
+
+===================================================================================================================================================
+Function:
+=========
+CREATE FUNCTION sarajend.GetDepartmentTotals 
+(@departmentId AS  INTEGER)
+ 
+RETURNS @resultTable TABLE(DepartmentId INTEGER, GraduateCount INTEGER, UndergraduateCount INTEGER) 
+AS
+BEGIN
+	IF EXISTS (SELECT DepartmentId FROM Department WHERE DepartmentId = @departmentId)
+		BEGIN
+			DECLARE @totalGraduateCount INTEGER = 0
+			DECLARE @totalUndergraduateCount INTEGER = 0
+			DECLARE @levelId INTEGER = 0 
+			DECLARE @cursorRowsCount INTEGER = 0
+			DECLARE @innerTable TABLE(DepartmentId INTEGER, GraduateCount INTEGER, UndergraduateCount INTEGER) 
+
+			DECLARE departmentTotalsCursor CURSOR STATIC FOR 
+				SELECT l.LevelId
+				  FROM Department d, Level l, StudentStatus ss, Student s, Course c, CourseSchedule cs, EnrollmentStatus es, CourseEnrollment ce
+				 WHERE d.DepartmentId			= @departmentId
+				   AND d.DepartmentId			= c.DepartmentId
+				   AND c.LevelId				= l.LevelId
+				   AND s.StudentStatusId		= ss.StudentStatusId
+				   AND c.CourseCode				= cs.CourseCode
+				   AND c.CourseNumber			= cs.CourseNumber
+				   AND cs.CourseRegNumber		= ce.CourseRegNumber
+				   AND ce.StudentId				= s.StudentId
+				   AND ce.EnrollmentStatusId	= es.EnrollmentStatusId
+
+			OPEN departmentTotalsCursor
+
+			SELECT @cursorRowsCount = @@CURSOR_ROWS 
+
+			IF (@@CURSOR_ROWS > 0)
+				BEGIN
+					FETCH NEXT FROM departmentTotalsCursor INTO @levelId
+	
+					WHILE @@FETCH_STATUS = 0
+						BEGIN
+							IF @levelId = '1'
+								BEGIN
+									SELECT @totalGraduateCount = @totalGraduateCount + 1
+								END
+							ELSE 
+								BEGIN
+									SELECT @totalUndergraduateCount = @totalUndergraduateCount + 1
+								END
+
+							FETCH NEXT FROM departmentTotalsCursor INTO @levelId
+						END
+				END
+			
+			CLOSE departmentTotalsCursor
+			DEALLOCATE departmentTotalsCursor
+			
+			INSERT INTO @innerTable VALUES(@departmentId, @totalGraduateCount, @totalUndergraduateCount)
+		END
+	ELSE
+		BEGIN
+			INSERT INTO @innerTable VALUES(@departmentId, -1, -1)
+		END
+	
+	INSERT INTO @resultTable SELECT * FROM @innerTable
+	RETURN
+END 
+
+===================================================================================================================================================
+View:
+=====
+CREATE VIEW sarajend.View_EmployeeBenefits AS
+	SELECT (p.FirstName + ' ' +  p.LastName) AS EmployeeName, e.EmployeeId, bt.BenefitTypeDesc, bc.BenefitCoverDesc, eb.EmployeePremiumAmount, eb.EmployerPremiumAmount
+	FROM Employee e, BenefitCover bc, BenefitType bt, EmployeeBenefit eb, Person p
+	WHERE e.EmployeeId = p.PersonId 
+	AND e.EmployeeId = eb.EmployeeId
+	AND eb.BenefitTypeId = bt.BenefitTypeId
+	AND eb.BenefitCoverId = bc.BenefitCoverId
+
+===================================================================================================================================================
